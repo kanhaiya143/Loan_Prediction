@@ -1,0 +1,215 @@
+train=read.csv("axisbank/train.csv")
+test=read.csv("axisbank/test.csv")
+final=read.csv("axisbank/test.csv")
+table(train$var_d1)
+train=train[,c(-1)]
+test=test[,c(-1,-2)]
+train$var_d1=as.numeric(factor(train$var_d1))
+test$var_d1=as.numeric(factor(test$var_d1))
+
+summary(train$var_d2)
+train$var_d2[train$var_d2== -1]=778
+train$var_d2[train$var_d2== 0]=778
+train$var_d2[is.na(train$var_d2)] = 785.4
+table(train$var_d7)
+summary(train$var_d2)
+
+table(train$var_d3)
+
+summary(test$var_d2)
+
+test$var_d2[test$var_d2== -1]=778
+summary(test$var_d2)
+test$var_d2[test$var_d2== 0]=778
+
+test$var_d2[is.na(test$var_d2)] = 785.6
+
+table(train$var_d2)
+
+
+
+summary(train$var_d7)
+
+train$var_d3=as.numeric(factor(train$var_d3))
+train$var_d4=as.numeric(factor(train$var_d4))
+train$var_d5=as.numeric(factor(train$var_d5))
+train$var_d6=as.numeric(factor(train$var_d6))
+train$var_d7=as.numeric(factor(train$var_d7))
+train$var_d8=as.numeric(factor(train$var_d8))
+
+train$var_d11=as.numeric(factor(train$var_d11))
+
+
+test$var_d3=as.numeric(factor(test$var_d3))
+test$var_d4=as.numeric(factor(test$var_d4))
+test$var_d5=as.numeric(factor(test$var_d5))
+test$var_d6=as.numeric(factor(test$var_d6))
+test$var_d7=as.numeric(factor(test$var_d7))
+test$var_d8=as.numeric(factor(test$var_d8))
+test$var_d11=as.numeric(factor(test$var_d11))
+
+
+
+
+
+########################################################################################## most accuracy
+library(h2o)
+
+
+h2o.init(nthreads = -1)
+
+y <- 'target'
+x <- setdiff(colnames(train),y)
+
+model=h2o.randomForest(
+                         y='target',
+                       ntree=3000,
+                       training_frame = as.h2o(train),
+                       mtries = 5,
+                       )
+library(ROCR)
+summary(model)
+performance(model,"acc")
+########################################################################################3
+prob_pred=h2o.predict(model,newdata = as.h2o(test))
+
+p=as.data.frame(prob_pred)
+z=p
+testing=cbind(final,p)
+testing=testing[,c(2,167)]
+
+write.csv(testing, file = "MyDataF1.csv")
+
+
+h2o.performance(model)
+h2o.auc(h2o.performance(rf2,newdata = valid))
+
+
+#######################################################
+
+splits <- h2o.splitFrame(
+  as.h2o(train),           
+  c(0.6,0.2),   
+ 
+  seed=1234)    
+
+t1 <- h2o.assign(splits[[1]], "t1.hex")   
+
+valid <- h2o.assign(splits[[2]], "valid.hex")   ## R valid, H2O valid.hex
+
+test2 <- h2o.assign(splits[[3]], "test2.hex")  
+
+y <- 'target'
+x <- setdiff(colnames(train),y)
+
+rf2 <- h2o.randomForest(        
+  training_frame = as.h2o(train),     
+       
+  x=x,                      
+  y='target',                   ##
+  model_id = "rf_covType2",     ## 
+  ntrees = 700,                 ##
+            
+  stopping_rounds = 2,          ##
+  stopping_tolerance = 1e-2,    ##
+  score_each_iteration = T,     ##
+  seed=3000000)            
+
+
+
+h2o.auc(h2o.performance(rf2,newdata = valid))
+h2o.performance(rf2)
+
+summary(rf2)
+finalRf_predictions<-h2o.predict(
+  object = rf2
+  ,as.h2o(test))
+
+
+
+p=as.data.frame(finalRf_predictions)
+z=p
+testing=cbind(final,p)
+testing=testing[,c(2,167)]
+
+write.csv(testing, file = "MyData6.csv")
+
+
+#########################################################################
+
+gbm3 <- h2o.gbm(
+  training_frame = t1,     ##
+  validation_frame = valid,   ##
+  x=x,                       ##
+  y='target',                    ## 
+  ntrees = 30,                ## add a few trees (from 20, though default is 50)
+  learn_rate = 0.3,           ## increase the learning rate even further
+               ## 
+  sample_rate = 0.7,          ## use a random 70% of the rows to fit each tree
+  col_sample_rate = 0.7,       ## use 70% of the columns to fit each tree
+  stopping_rounds = 2,        ## 
+  stopping_tolerance = 0.01,  ##
+  score_each_iteration = T,   ##
+  model_id = "gbm_covType3",  ##
+  seed = 2000000)
+
+
+summary(gbm3)
+finalRf_predictionsgbm3<-h2o.predict(
+  object = gbm3
+  ,as.h2o(test))
+
+
+
+p=as.data.frame(finalRf_predictionsgbm3)
+z=p
+testing=cbind(final,p)
+testing=testing[,c(2,167)]
+
+write.csv(testing, file = "MyData5.csv")
+
+########################################################################
+h2o.shutdown()
+Y
+###############################################################################
+
+splits <- h2o.splitFrame(
+  as.h2o(train),           
+ ratios = 0.75,    
+  
+  seed=1234)    
+
+trainx <- h2o.assign(splits[[1]], "trainx.hex")   
+
+valid <- h2o.assign(splits[[2]], "valid.hex")   
+
+
+mol=h2o.glm(y='target',training_frame = as.h2o(train),validation_frame = valid
+            ,family= "binomial",lambda_search = TRUE
+            )
+
+
+ppred=h2o.predict(mol,newdata = as.h2o(test))
+
+p=as.data.frame(ppred)
+z=p
+testing=cbind(final,p)
+testing=testing[,c(2,167)]
+
+write.csv(testing, file = "MyDataF_glm.csv")
+
+
+#####################################################
+
+glmodel=glm(target~.,data=train,family = "binomial")
+glm_pred=predict(glmodel,newdata=test,type="response")
+
+
+
+p=as.data.frame(glm_pred)
+z=p
+testing=cbind(final,p)
+testing=testing[,c(2,167)]
+
+write.csv(testing, file = "MyDataF_glm1.csv")
+
